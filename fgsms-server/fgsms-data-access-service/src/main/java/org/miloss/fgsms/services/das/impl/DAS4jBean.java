@@ -698,87 +698,20 @@ public class DAS4jBean implements DataAccessService, OpStatusService {
         res.setAverageResponseTime(0);
         res.setFailingInvocations(0);
         res.setSuccessfulInvocations(0);
-        boolean norecords = true;
-        boolean toomanyrecords = false;
-        long totalinvocations = 0;
         try {
-
-            /////////////////////////////////////////////
-            //query
-            /////////////////////////////////////////////
-            comm = con.prepareStatement("select avg(responsetimems),count(*)from rawdata where UTCdatetime >= ? and UTCdatetime <= ? and hostingsource=?;");
-            //average response time for a host, total transactions
-            //average response time for a host, total transactions
-
+            //average response time, total and failed transactions for a host in one pass over rawdata
+            comm = con.prepareStatement("select avg(responsetimems), count(*), count(case when success=false then 1 end) from rawdata where UTCdatetime >= ? and UTCdatetime <= ? and hostingsource=?;");
             comm.setLong(1, request.getRange().getStart().getTimeInMillis());
             comm.setLong(2, request.getRange().getEnd().getTimeInMillis());
             comm.setString(3, request.getHostname());
-
             avg = comm.executeQuery();
-
-            //if (!avg.isClosed()) {
-            while (avg.next()) {
-                if (!norecords) {
-                    toomanyrecords = true;
-                }
-                norecords = false;
+            if (avg.next()) {
+                long totalinvocations = avg.getLong(2);
+                long failures = avg.getLong(3);
                 res.setAverageResponseTime((long) avg.getFloat(1));
-                totalinvocations = avg.getLong(2);
+                res.setFailingInvocations(failures);
+                res.setSuccessfulInvocations(totalinvocations - failures);
             }
-            //}
-            if (norecords) {
-                //no data available
-                res.setAverageResponseTime(0);
-                res.setFailingInvocations(0);
-                res.setSuccessfulInvocations(0);
-                comm.close();
-                con.close();
-                return res;
-            }
-        } catch (Exception ex) {
-            log.log(Level.ERROR, "sql error from getPerformanceAverageHostingStats", ex);
-            ServiceUnavailableException code = new ServiceUnavailableException("", null);
-            code.getFaultInfo().setCode(ServiceUnavailableFaultCodes.UNEXPECTED_ERROR);
-            throw code;
-        } finally {
-            DBUtils.safeClose(avg);
-            DBUtils.safeClose(comm);
-            DBUtils.safeClose(con);
-        }
-
-        try {
-
-            if (toomanyrecords) {
-                ServiceUnavailableException code = new ServiceUnavailableException("", null);
-                code.getFaultInfo().setCode(ServiceUnavailableFaultCodes.UNEXPECTED_ERROR);
-                log.log(Level.ERROR, "too many records returned for getPerformanceAverageHostingStats returned. this is unexpected");
-                throw code;
-            }
-            norecords = true;
-            toomanyrecords = false;
-            con = Utility.getPerformanceDBConnection();
-            comm = con.prepareStatement("select count(*) from rawdata where UTCdatetime >= ? and UTCdatetime <= ? and hostingsource=? and success=false;");
-            comm.setLong(1, request.getRange().getStart().getTimeInMillis());
-            comm.setLong(2, request.getRange().getEnd().getTimeInMillis());
-            comm.setString(3, request.getHostname());
-            avg = comm.executeQuery();
-            //if (!failures.isClosed()) {
-            while (avg.next()) {
-                if (!norecords) {
-                    toomanyrecords = true;
-                }
-                res.setFailingInvocations(avg.getLong(1));
-                res.setSuccessfulInvocations(totalinvocations - avg.getLong(1));
-                norecords = false;
-            }
-            // }
-            if (toomanyrecords) {
-                ServiceUnavailableException code = new ServiceUnavailableException("", null);
-                code.getFaultInfo().setCode(ServiceUnavailableFaultCodes.UNEXPECTED_ERROR);
-                log.log(Level.ERROR, "too many records returned for getPerformanceAverageHostingStats returned. this is unexpected");
-                throw code;
-            }
-
             res.setClassification(getCurrentClassificationLevel());
             return res;
         } catch (Exception ex) {
