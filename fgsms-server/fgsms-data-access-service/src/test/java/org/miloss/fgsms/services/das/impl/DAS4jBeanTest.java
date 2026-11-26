@@ -1437,7 +1437,10 @@ public class DAS4jBeanTest extends WebServiceBaseTests {
                 cmd.execute();
             }
             cmd.close();
-
+        } finally {
+            con.close();
+        }
+        try {
             GetPerformanceAverageHostStatsRequestMsg request = new GetPerformanceAverageHostStatsRequestMsg();
             request.setClassification(new SecurityWrapper());
             request.setHostname(host);
@@ -1460,6 +1463,7 @@ public class DAS4jBeanTest extends WebServiceBaseTests {
             assertEquals(0, result.getSuccessfulInvocations());
             assertEquals(0, result.getFailingInvocations());
         } finally {
+            con = Utility.getPerformanceDBConnection();
             PreparedStatement cleanup = con.prepareStatement("delete from rawdata where hostingsource=?;");
             cleanup.setString(1, host);
             cleanup.execute();
