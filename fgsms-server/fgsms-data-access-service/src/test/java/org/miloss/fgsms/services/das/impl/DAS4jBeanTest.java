@@ -1418,29 +1418,30 @@ public class DAS4jBeanTest extends WebServiceBaseTests {
         System.out.println("testGetPerformanceAverageHostingStatsCounts");
         String host = "junit-hosting-stats-" + UUID.randomUUID().toString();
         long now = System.currentTimeMillis();
-        Connection con = Utility.getPerformanceDBConnection();
         try {
-            PreparedStatement cmd = con.prepareStatement("INSERT INTO rawdata(uri, responsetimems, monitorsource, hostingsource, transactionid, soapaction, "
-                   + "responsesize, requestsize, utcdatetime, success) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?);");
-            int[] times = {100, 200, 600, 50};
-            boolean[] success = {true, true, false, true};
-            long[] when = {now - 3000, now - 2000, now - 1000, now - 86400000L};
-            for (int i = 0; i < times.length; i++) {
-                cmd.setString(1, "http://" + host + "/svc");
-                cmd.setInt(2, times[i]);
-                cmd.setString(3, host);
-                cmd.setString(4, host);
-                cmd.setString(5, UUID.randomUUID().toString());
-                cmd.setString(6, "POST");
-                cmd.setLong(7, when[i]);
-                cmd.setBoolean(8, success[i]);
-                cmd.execute();
+            Connection con = Utility.getPerformanceDBConnection();
+            try {
+                PreparedStatement cmd = con.prepareStatement("INSERT INTO rawdata(uri, responsetimems, monitorsource, hostingsource, transactionid, soapaction, "
+                       + "responsesize, requestsize, utcdatetime, success) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?);");
+                int[] times = {100, 200, 600, 50};
+                boolean[] success = {true, true, false, true};
+                long[] when = {now - 3000, now - 2000, now - 1000, now - 86400000L};
+                for (int i = 0; i < times.length; i++) {
+                    cmd.setString(1, "http://" + host + "/svc");
+                    cmd.setInt(2, times[i]);
+                    cmd.setString(3, host);
+                    cmd.setString(4, host);
+                    cmd.setString(5, UUID.randomUUID().toString());
+                    cmd.setString(6, "POST");
+                    cmd.setLong(7, when[i]);
+                    cmd.setBoolean(8, success[i]);
+                    cmd.execute();
+                }
+                cmd.close();
+            } finally {
+                con.close();
             }
-            cmd.close();
-        } finally {
-            con.close();
-        }
-        try {
+
             GetPerformanceAverageHostStatsRequestMsg request = new GetPerformanceAverageHostStatsRequestMsg();
             request.setClassification(new SecurityWrapper());
             request.setHostname(host);
@@ -1463,7 +1464,7 @@ public class DAS4jBeanTest extends WebServiceBaseTests {
             assertEquals(0, result.getSuccessfulInvocations());
             assertEquals(0, result.getFailingInvocations());
         } finally {
-            con = Utility.getPerformanceDBConnection();
+            Connection con = Utility.getPerformanceDBConnection();
             PreparedStatement cleanup = con.prepareStatement("delete from rawdata where hostingsource=?;");
             cleanup.setString(1, host);
             cleanup.execute();
